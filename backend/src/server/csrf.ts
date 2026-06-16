@@ -153,6 +153,21 @@ export const registerCsrfProtection = ({
       return next();
     }
 
+    // MCP service API token bypasses CSRF (paired with the requireAuth bypass in
+    // middleware/auth.ts). Requests carrying the static MCP_API_TOKEN bearer are
+    // trusted service-to-service calls, not browser form posts.
+    const mcpApiToken = process.env.MCP_API_TOKEN;
+    if (mcpApiToken) {
+      const authHeader = req.headers["authorization"];
+      const bearer =
+        typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+          ? authHeader.slice("Bearer ".length)
+          : null;
+      if (bearer && bearer === mcpApiToken) {
+        return next();
+      }
+    }
+
     const origin = req.headers["origin"];
     const referer = req.headers["referer"];
     const originValue = Array.isArray(origin) ? origin[0] : origin;

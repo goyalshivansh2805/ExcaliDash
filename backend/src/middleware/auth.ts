@@ -206,6 +206,27 @@ export const createAuthMiddleware = ({
     next: NextFunction,
   ): Promise<void> => {
     try {
+      // MCP service API token: a static bearer token (env MCP_API_TOKEN) that
+      // bypasses JWT auth and acts as the admin user. Used by the Excalidraw MCP
+      // server so AI-generated drawings land in the admin's gallery.
+      const apiToken = process.env.MCP_API_TOKEN;
+      if (apiToken && extractToken(req) === apiToken) {
+        const adminUser =
+          (await prisma.user.findFirst({ where: { isActive: true, role: "ADMIN" } })) ??
+          (await prisma.user.findFirst({ where: { isActive: true } }));
+        if (adminUser) {
+          req.user = {
+            id: adminUser.id,
+            username: adminUser.username,
+            email: adminUser.email,
+            name: adminUser.name,
+            role: adminUser.role,
+            mustResetPassword: adminUser.mustResetPassword,
+          };
+          return next();
+        }
+      }
+
       const authEnabled = await authModeService.getAuthEnabled();
       if (!authEnabled) {
         const user = await authModeService.getBootstrapActingUser();
